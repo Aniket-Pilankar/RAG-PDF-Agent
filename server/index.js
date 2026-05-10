@@ -2,11 +2,12 @@ import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
 import { Queue } from 'bullmq';
-import { OpenAIEmbeddings } from '@langchain/openai';
+import { OpenAIEmbeddings, ChatOpenAI } from '@langchain/openai';
 import { QdrantVectorStore } from '@langchain/qdrant';
-import OpenAI from 'openai';
+import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 
-const client = new OpenAI({
+const llm = new ChatOpenAI({
+  model: 'gpt-4o-mini',
   apiKey: process.env.OPENAI_API_KEY,
 });
 const queue = new Queue('file-upload-queue', {
@@ -76,16 +77,13 @@ app.get('/chat', async (req, res) => {
   ${JSON.stringify(result)}
   `;
 
-  const chatResult = await client.chat.completions.create({
-    model: 'gpt-4o-mini',
-    messages: [
-      { role: 'system', content: SYSTEM_PROMPT },
-      { role: 'user', content: userQuery },
-    ],
-  });
+  const chatResult = await llm.invoke([
+    new SystemMessage(SYSTEM_PROMPT),
+    new HumanMessage(userQuery),
+  ]);
 
   return res.json({
-    message: chatResult.choices[0].message.content,
+    message: chatResult.content,
     docs: result,
   });
 });
