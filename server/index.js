@@ -1,7 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import multer from 'multer';
-import { Queue } from 'bullmq';
+import { createServer } from 'http';
+import { Server } from 'socket.io';
+import { Queue, QueueEvents, Job } from 'bullmq';
 import { OpenAIEmbeddings, ChatOpenAI } from '@langchain/openai';
 import { QdrantVectorStore } from '@langchain/qdrant';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
@@ -11,12 +13,11 @@ const llm = new ChatOpenAI({
   model: 'gpt-4o-mini',
   apiKey: process.env.OPENAI_API_KEY,
 });
-const queue = new Queue('file-upload-queue', {
-  connection: {
-    host: 'localhost',
-    port: '6379',
-  },
-});
+
+const redisConnection = { host: 'localhost', port: '6379' };
+
+const queue = new Queue('file-upload-queue', { connection: redisConnection });
+const queueEvents = new QueueEvents('file-upload-queue', { connection: redisConnection });
 
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
@@ -35,6 +36,33 @@ app.use(cors({ origin: 'http://localhost:3000', allowedHeaders: ['Authorization'
 app.use('/uploads', express.static('uploads'));
 app.use(clerkMiddleware());
 
+const httpServer = createServer(app);
+const io = new Server(httpServer, {
+  cors: { origin: 'http://localhost:3000' },
+});
+
+io.on('connection', (socket) => {
+  socket.on('subscribe', async (jobId) => {
+    socket.join(jobId);
+
+    // Race condition: emit immediately if job already finished before client connected
+    const job = await Job.fromId(queue, jobId);
+    if (job) {
+      const jobState = await job.getState();
+      if (jobState === 'completed' || jobState === 'failed') {
+        socket.emit('job:status', { status: jobState });
+      }
+    }
+  });
+});
+
+queueEvents.on('completed', ({ jobId }) => {
+  io.to(jobId).emit('job:status', { status: 'completed' });
+});
+queueEvents.on('failed', ({ jobId }) => {
+  io.to(jobId).emit('job:status', { status: 'failed' });
+});
+
 app.get('/', (req, res) => {
   return res.json({ status: 'All Good!' });
 });
@@ -45,7 +73,7 @@ app.post('/upload/pdf', upload.single('pdf'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ error: 'No PDF file provided.' });
   }
-  await queue.add(
+  const job = await queue.add(
     'file-ready',
     JSON.stringify({
       filename: req.file.originalname,
@@ -54,7 +82,7 @@ app.post('/upload/pdf', upload.single('pdf'), async (req, res) => {
       userId,
     })
   );
-  return res.json({ message: 'uploaded' });
+  return res.json({ message: 'uploaded', jobId: job.id });
 });
 
 app.get('/chat', async (req, res) => {
@@ -98,4 +126,4 @@ app.get('/chat', async (req, res) => {
   });
 });
 
-app.listen(8000, () => console.log(`Server started on PORT:${8000}`));
+httpServer.listen(8000, () => console.log(`Server started on PORT:8000`));
