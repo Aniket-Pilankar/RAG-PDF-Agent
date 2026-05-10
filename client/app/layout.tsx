@@ -33,7 +33,7 @@ export default function RootLayout({
         <ClerkProvider>
           <Show when="signed-out">
             <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-500 to-blue-500">
-              <SignIn />
+              <SignIn routing="hash" />
             </div>
           </Show>
           <Show when="signed-in">
