@@ -5,6 +5,7 @@ import { Queue } from 'bullmq';
 import { OpenAIEmbeddings, ChatOpenAI } from '@langchain/openai';
 import { QdrantVectorStore } from '@langchain/qdrant';
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { clerkMiddleware, getAuth } from '@clerk/express';
 
 const llm = new ChatOpenAI({
   model: 'gpt-4o-mini',
@@ -30,14 +31,17 @@ const storage = multer.diskStorage({
 const upload = multer({ storage: storage });
 
 const app = express();
-app.use(cors());
+app.use(cors({ origin: 'http://localhost:3000', allowedHeaders: ['Authorization', 'Content-Type'] }));
 app.use('/uploads', express.static('uploads'));
+app.use(clerkMiddleware());
 
 app.get('/', (req, res) => {
   return res.json({ status: 'All Good!' });
 });
 
 app.post('/upload/pdf', upload.single('pdf'), async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
   if (!req.file) {
     return res.status(400).json({ error: 'No PDF file provided.' });
   }
@@ -47,12 +51,15 @@ app.post('/upload/pdf', upload.single('pdf'), async (req, res) => {
       filename: req.file.originalname,
       destination: req.file.destination,
       path: req.file.path,
+      userId,
     })
   );
   return res.json({ message: 'uploaded' });
 });
 
 app.get('/chat', async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
   const userQuery = req.query.message;
 
   const embeddings = new OpenAIEmbeddings({
@@ -68,6 +75,9 @@ app.get('/chat', async (req, res) => {
   );
   const ret = vectorStore.asRetriever({
     k: 2,
+    filter: {
+      must: [{ key: 'metadata.userId', match: { value: userId } }],
+    },
   });
   const result = await ret.invoke(userQuery);
 

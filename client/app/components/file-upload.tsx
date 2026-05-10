@@ -1,4 +1,5 @@
 'use client';
+import { useAuth } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
 import { CheckCircle, FileText, Loader2, Upload, XCircle } from 'lucide-react';
 import * as React from 'react';
@@ -6,6 +7,7 @@ import * as React from 'react';
 type UploadState = 'idle' | 'uploading' | 'success' | 'error';
 
 const FileUploadComponent: React.FC = () => {
+  const { getToken } = useAuth();
   const [state, setState] = React.useState<UploadState>('idle');
   const [fileName, setFileName] = React.useState<string | null>(null);
 
@@ -13,10 +15,12 @@ const FileUploadComponent: React.FC = () => {
     setFileName(file.name);
     setState('uploading');
     try {
+      const token = await getToken();
       const formData = new FormData();
       formData.append('pdf', file);
       const res = await fetch('http://localhost:8000/upload/pdf', {
         method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
       if (!res.ok) throw new Error();

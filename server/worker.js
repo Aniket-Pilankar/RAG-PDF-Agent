@@ -13,6 +13,8 @@ const worker = new Worker(
     const loader = new PDFLoader(data.path);
     const docs = await loader.load();
 
+    docs.forEach(doc => { doc.metadata.userId = data.userId; });
+
     const embeddings = new OpenAIEmbeddings({
       model: 'text-embedding-3-small',
       apiKey: process.env.OPENAI_API_KEY,

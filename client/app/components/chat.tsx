@@ -1,5 +1,6 @@
 'use client';
 
+import { useAuth } from '@clerk/nextjs';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Bot, ChevronDown, Download, FileText, Send, User } from 'lucide-react';
@@ -98,6 +99,7 @@ function TypingIndicator() {
 }
 
 const ChatComponent: React.FC = () => {
+  const { getToken } = useAuth();
   const [message, setMessage] = React.useState('');
   const [messages, setMessages] = React.useState<IMessage[]>([]);
   const [loading, setLoading] = React.useState(false);
@@ -114,7 +116,10 @@ const ChatComponent: React.FC = () => {
     setMessages((prev) => [...prev, { role: 'user', content: text }]);
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:8000/chat?message=${encodeURIComponent(text)}`);
+      const token = await getToken();
+      const res = await fetch(`http://localhost:8000/chat?message=${encodeURIComponent(text)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       const data = await res.json();
       setMessages((prev) => [
         ...prev,
