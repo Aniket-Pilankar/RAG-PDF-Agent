@@ -7,7 +7,11 @@ import * as React from 'react';
 
 type UploadState = 'idle' | 'uploading' | 'processing' | 'ready' | 'error';
 
-const FileUploadComponent: React.FC = () => {
+interface FileUploadProps {
+  onUploadComplete?: () => void;
+}
+
+const FileUploadComponent: React.FC<FileUploadProps> = ({ onUploadComplete }) => {
   const { getToken } = useAuth();
   const [state, setState] = React.useState<UploadState>('idle');
   const [fileName, setFileName] = React.useState<string | null>(null);
@@ -30,6 +34,7 @@ const FileUploadComponent: React.FC = () => {
     socket.on('job:status', ({ status }: { status: string }) => {
       if (status === 'completed') {
         setState('ready');
+        onUploadComplete?.();
       } else if (status === 'failed') {
         setState('error');
       }
