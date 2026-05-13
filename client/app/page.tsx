@@ -1,7 +1,16 @@
+'use client';
+
+import * as React from 'react';
 import ChatComponent from './components/chat';
 import FileUploadComponent from './components/file-upload';
+import PdfListComponent from './components/pdf-list';
 
 export default function Home() {
+  const [refreshKey, setRefreshKey] = React.useState(0);
+  console.log('refreshKey', refreshKey);
+  const [selectedPdfIds, setSelectedPdfIds] = React.useState<string[]>([]);
+  console.log('selectedPdfIds', selectedPdfIds);
+
   return (
     <div className="h-[calc(100vh-64px)] flex overflow-hidden bg-background">
       <aside className="w-72 shrink-0 border-r border-border flex flex-col p-5 gap-5 overflow-y-auto bg-card">
@@ -9,8 +18,14 @@ export default function Home() {
           <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-3">
             Documents
           </p>
-          <FileUploadComponent />
+          <FileUploadComponent onUploadComplete={() => setRefreshKey((k) => k + 1)} />
         </div>
+
+        <PdfListComponent
+          refreshKey={refreshKey}
+          onSelectionChange={setSelectedPdfIds}
+        />
+
         <div className="rounded-lg bg-muted p-4 text-xs text-muted-foreground leading-relaxed">
           <p className="font-medium text-foreground mb-2">How it works</p>
           <ol className="list-decimal list-inside space-y-1">
@@ -22,7 +37,7 @@ export default function Home() {
       </aside>
 
       <main className="flex-1 flex flex-col overflow-hidden">
-        <ChatComponent />
+        <ChatComponent selectedPdfIds={selectedPdfIds} />
       </main>
     </div>
   );

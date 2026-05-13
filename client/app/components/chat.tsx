@@ -98,7 +98,11 @@ function TypingIndicator() {
   );
 }
 
-const ChatComponent: React.FC = () => {
+interface ChatProps {
+  selectedPdfIds?: string[];
+}
+
+const ChatComponent: React.FC<ChatProps> = ({ selectedPdfIds }) => {
   const { getToken } = useAuth();
   const [message, setMessage] = React.useState('');
   const [messages, setMessages] = React.useState<IMessage[]>([]);
@@ -109,6 +113,10 @@ const ChatComponent: React.FC = () => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
 
+  React.useEffect(() => {
+    console.log('Messages:', messages);
+  }, [messages]);
+
   const sendMessage = async () => {
     const text = message.trim();
     if (!text || loading) return;
@@ -117,7 +125,8 @@ const ChatComponent: React.FC = () => {
     setLoading(true);
     try {
       const token = await getToken();
-      const res = await fetch(`http://localhost:8000/chat?message=${encodeURIComponent(text)}`, {
+      const pdfParam = selectedPdfIds?.length ? `&pdfIds=${selectedPdfIds.join(',')}` : '';
+      const res = await fetch(`http://localhost:8000/chat?message=${encodeURIComponent(text)}${pdfParam}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
