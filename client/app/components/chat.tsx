@@ -100,22 +100,41 @@ function TypingIndicator() {
 
 interface ChatProps {
   selectedPdfIds?: string[];
+  sessionId?: string | null;
+  onSessionCreated?: (id: string) => void;
 }
 
-const ChatComponent: React.FC<ChatProps> = ({ selectedPdfIds }) => {
+const ChatComponent: React.FC<ChatProps> = ({ selectedPdfIds, sessionId, onSessionCreated }) => {
   const { getToken } = useAuth();
   const [message, setMessage] = React.useState('');
   const [messages, setMessages] = React.useState<IMessage[]>([]);
   const [loading, setLoading] = React.useState(false);
   const bottomRef = React.useRef<HTMLDivElement>(null);
 
+
   React.useEffect(() => {
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, loading]);
 
   React.useEffect(() => {
-    console.log('Messages:', messages);
-  }, [messages]);
+    if (!sessionId) {
+      setMessages([]);
+      return;
+    }
+    let cancelled = false;
+    (async () => {
+      const token = await getToken();
+      const res = await fetch(`http://localhost:8000/chat/sessions/${sessionId}/messages`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok || cancelled) return;
+      const data: { role: string; content: string }[] = await res.json();
+      if (!cancelled) {
+        setMessages(data.map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content })));
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [sessionId]);
 
   const sendMessage = async () => {
     const text = message.trim();
@@ -125,8 +144,22 @@ const ChatComponent: React.FC<ChatProps> = ({ selectedPdfIds }) => {
     setLoading(true);
     try {
       const token = await getToken();
+      let currentSessionId = sessionId ?? null;
+
+      if (!currentSessionId) {
+        const res = await fetch('http://localhost:8000/chat/sessions', {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: text.slice(0, 80) }),
+        });
+        const created = await res.json();
+        currentSessionId = created.id;
+        onSessionCreated?.(created.id);
+      }
+
       const pdfParam = selectedPdfIds?.length ? `&pdfIds=${selectedPdfIds.join(',')}` : '';
-      const res = await fetch(`http://localhost:8000/chat?message=${encodeURIComponent(text)}${pdfParam}`, {
+      const sessionParam = `&sessionId=${currentSessionId}`;
+      const res = await fetch(`http://localhost:8000/chat?message=${encodeURIComponent(text)}${pdfParam}${sessionParam}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data = await res.json();
