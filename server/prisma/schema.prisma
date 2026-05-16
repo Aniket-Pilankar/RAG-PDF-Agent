@@ -15,3 +15,21 @@ model Pdf {
   status     String   @default("processing")
   uploadedAt DateTime @default(now())
 }
+
+model ChatSession {
+  id        String    @id @default(uuid())
+  userId    String
+  title     String    @default("New Chat")
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  messages  Message[]
+}
+
+model Message {
+  id        String      @id @default(uuid())
+  sessionId String
+  role      String
+  content   String
+  createdAt DateTime    @default(now())
+  session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+}

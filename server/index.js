@@ -132,12 +132,71 @@ app.delete('/pdfs/:id', async (req, res) => {
   return res.json({ success: true });
 });
 
+app.post('/chat/sessions', async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const { title } = req.body;
+  const session = await prisma.chatSession.create({
+    data: { userId, title: title?.slice(0, 100) || 'New Chat' },
+  });
+
+  return res.json(session);
+});
+
+app.get('/chat/sessions', async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const sessions = await prisma.chatSession.findMany({
+    where: { userId },
+    orderBy: { updatedAt: 'desc' },
+    select: { id: true, title: true, updatedAt: true, createdAt: true },
+  });
+
+  return res.json(sessions);
+});
+
+app.get('/chat/sessions/:id/messages', async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const session = await prisma.chatSession.findUnique({ where: { id: req.params.id } });
+  if (!session || session.userId !== userId) return res.status(404).json({ error: 'Not found' });
+
+  const messages = await prisma.message.findMany({
+    where: { sessionId: req.params.id },
+    orderBy: { createdAt: 'asc' },
+    select: { id: true, role: true, content: true, createdAt: true },
+  });
+
+  return res.json(messages);
+});
+
+app.delete('/chat/sessions/:id', async (req, res) => {
+  const { userId } = getAuth(req);
+  if (!userId) return res.status(401).json({ error: 'Unauthorized' });
+
+  const session = await prisma.chatSession.findUnique({ where: { id: req.params.id } });
+  if (!session || session.userId !== userId) return res.status(404).json({ error: 'Not found' });
+
+  await prisma.chatSession.delete({ where: { id: req.params.id } });
+  return res.json({ success: true });
+});
+
 app.get('/chat', async (req, res) => {
   const { userId } = getAuth(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
   const userQuery = req.query.message;
   const pdfIds = req.query.pdfIds ? String(req.query.pdfIds).split(',') : null;
+  const sessionId = req.query.sessionId ? String(req.query.sessionId) : null;
+
+  if (sessionId) {
+    const session = await prisma.chatSession.findUnique({ where: { id: sessionId } });
+    if (!session || session.userId !== userId) return res.status(404).json({ error: 'Session not found' });
+    await prisma.message.create({ data: { sessionId, role: 'user', content: userQuery } });
+  }
 
   const embeddings = new OpenAIEmbeddings({
     model: 'text-embedding-3-small',
@@ -169,6 +228,13 @@ app.get('/chat', async (req, res) => {
     new SystemMessage(SYSTEM_PROMPT),
     new HumanMessage(userQuery),
   ]);
+
+  if (sessionId) {
+    await Promise.all([
+      prisma.message.create({ data: { sessionId, role: 'assistant', content: String(chatResult.content) } }),
+      prisma.chatSession.update({ where: { id: sessionId }, data: { updatedAt: new Date() } }),
+    ]);
+  }
 
   return res.json({ message: chatResult.content, docs: result });
 });
