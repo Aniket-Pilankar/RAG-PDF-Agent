@@ -2,6 +2,7 @@ import { Worker } from 'bullmq';
 import { OpenAIEmbeddings } from '@langchain/openai';
 import { QdrantVectorStore } from '@langchain/qdrant';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
+import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -14,7 +15,13 @@ const worker = new Worker(
 
     try {
       const loader = new PDFLoader(data.path);
-      const docs = await loader.load();
+      const rawDocs = await loader.load();
+
+      const splitter = new RecursiveCharacterTextSplitter({
+        chunkSize: 1000,
+        chunkOverlap: 200,
+      });
+      const docs = await splitter.splitDocuments(rawDocs);
 
       docs.forEach(doc => {
         doc.metadata.userId = data.userId;

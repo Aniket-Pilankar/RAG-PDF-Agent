@@ -215,7 +215,7 @@ app.post('/chat', async (req, res) => {
     ],
   };
 
-  const retriever = vectorStore.asRetriever({ k: 2, filter });
+  const retriever = vectorStore.asRetriever({ k: 5, filter });
 
   const contextualizeQPrompt = ChatPromptTemplate.fromMessages([
     ['system', 'Given the chat history and the latest user question which might reference context in the chat history, formulate a standalone question that can be understood without the chat history. Do NOT answer the question — just reformulate it if needed, otherwise return it as is.'],
@@ -235,11 +235,17 @@ app.post('/chat', async (req, res) => {
     msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content)
   );
 
-  const retrievalQuery = formattedHistory.length > 0
+  const standaloneQuery = formattedHistory.length > 0
     ? await contextualizeQPrompt.pipe(llm).pipe(new StringOutputParser()).invoke({ input: userQuery, chat_history: formattedHistory })
     : userQuery;
 
-  const docs = await retriever.invoke(retrievalQuery);
+  const hydePrompt = ChatPromptTemplate.fromMessages([
+    ['system', 'Write a short passage (2-4 sentences) that directly answers the following question. Write it as if it were extracted from a document — do not say "I" or address the user.'],
+    ['human', '{question}'],
+  ]);
+  const hypotheticalAnswer = await hydePrompt.pipe(llm).pipe(new StringOutputParser()).invoke({ question: standaloneQuery });
+
+  const docs = await retriever.invoke(hypotheticalAnswer);
   const context = docs.map((d) => d.pageContent).join('\n\n');
   const answer = await qaPrompt.pipe(llm).pipe(new StringOutputParser()).invoke({ input: userQuery, chat_history: formattedHistory, context });
 
