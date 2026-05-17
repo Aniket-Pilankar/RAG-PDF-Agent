@@ -51,8 +51,9 @@ function SourcesAccordion({ docs }: { docs: Doc[] }) {
           {docs.map((doc, i) => {
             const source = doc.metadata?.source ?? '';
             const displayName = extractDisplayName(source);
-            const rawTitle = doc.metadata?.pdf?.info?.Title ?? '';
-            const title = rawTitle.replace(/^Microsoft Word - /, '') || displayName;
+            // const rawTitle = doc.metadata?.pdf?.info?.Title ?? '';
+            // const title = rawTitle.replace(/^Microsoft Word - /, '') || displayName;
+            const title = displayName;
             const page = doc.metadata?.loc?.pageNumber;
 
             return (
