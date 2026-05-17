@@ -7,7 +7,9 @@ import { Server } from 'socket.io';
 import { Queue, QueueEvents, Job } from 'bullmq';
 import { OpenAIEmbeddings, ChatOpenAI } from '@langchain/openai';
 import { QdrantVectorStore } from '@langchain/qdrant';
-import { HumanMessage, SystemMessage } from '@langchain/core/messages';
+import { HumanMessage, AIMessage } from '@langchain/core/messages';
+import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts';
+import { StringOutputParser } from '@langchain/core/output_parsers';
 import { clerkMiddleware, getAuth } from '@clerk/express';
 import { PrismaClient } from '@prisma/client';
 
@@ -184,13 +186,11 @@ app.delete('/chat/sessions/:id', async (req, res) => {
   return res.json({ success: true });
 });
 
-app.get('/chat', async (req, res) => {
+app.post('/chat', async (req, res) => {
   const { userId } = getAuth(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-  const userQuery = req.query.message;
-  const pdfIds = req.query.pdfIds ? String(req.query.pdfIds).split(',') : null;
-  const sessionId = req.query.sessionId ? String(req.query.sessionId) : null;
+  const { message: userQuery, chatHistory = [], pdfIds, sessionId } = req.body;
 
   if (sessionId) {
     const session = await prisma.chatSession.findUnique({ where: { id: sessionId } });
@@ -211,32 +211,50 @@ app.get('/chat', async (req, res) => {
   const filter = {
     must: [
       { key: 'metadata.userId', match: { value: userId } },
-      ...(pdfIds ? [{ key: 'metadata.pdfId', match: { any: pdfIds } }] : []),
+      ...(pdfIds?.length ? [{ key: 'metadata.pdfId', match: { any: pdfIds } }] : []),
     ],
   };
 
-  const ret = vectorStore.asRetriever({ k: 2, filter });
-  const result = await ret.invoke(userQuery);
+  const retriever = vectorStore.asRetriever({ k: 2, filter });
 
-  const SYSTEM_PROMPT = `
-  You are helpful AI Assistant who answeres the user query based on the available context from PDF File.
-  Context:
-  ${JSON.stringify(result)}
-  `;
-
-  const chatResult = await llm.invoke([
-    new SystemMessage(SYSTEM_PROMPT),
-    new HumanMessage(userQuery),
+  const contextualizeQPrompt = ChatPromptTemplate.fromMessages([
+    ['system', 'Given the chat history and the latest user question which might reference context in the chat history, formulate a standalone question that can be understood without the chat history. Do NOT answer the question — just reformulate it if needed, otherwise return it as is.'],
+    new MessagesPlaceholder('chat_history'),
+    ['human', '{input}'],
   ]);
+
+  const qaPrompt = ChatPromptTemplate.fromMessages([
+    ['system', `You are a helpful AI Assistant who answers the user's question based on the PDF context below.\nIf you don't know the answer from the context, say you don't know — do not make things up.\n\nContext:\n{context}`],
+    new MessagesPlaceholder('chat_history'),
+    ['human', '{input}'],
+  ]);
+
+  console.log('chatHistory', chatHistory);
+
+  const formattedHistory = chatHistory.map((msg) =>
+    msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content)
+  );
+
+  const retrievalQuery = formattedHistory.length > 0
+    ? await contextualizeQPrompt.pipe(llm).pipe(new StringOutputParser()).invoke({ input: userQuery, chat_history: formattedHistory })
+    : userQuery;
+
+  const docs = await retriever.invoke(retrievalQuery);
+  const context = docs.map((d) => d.pageContent).join('\n\n');
+  const answer = await qaPrompt.pipe(llm).pipe(new StringOutputParser()).invoke({ input: userQuery, chat_history: formattedHistory, context });
+
+  const result = { answer, context: docs };
+
+  console.log('result', result);
 
   if (sessionId) {
     await Promise.all([
-      prisma.message.create({ data: { sessionId, role: 'assistant', content: String(chatResult.content) } }),
+      prisma.message.create({ data: { sessionId, role: 'assistant', content: result.answer } }),
       prisma.chatSession.update({ where: { id: sessionId }, data: { updatedAt: new Date() } }),
     ]);
   }
 
-  return res.json({ message: chatResult.content, docs: result });
+  return res.json({ message: result.answer, docs: result.context });
 });
 
 httpServer.listen(8000, () => console.log(`Server started on PORT:8000`));

@@ -139,6 +139,7 @@ const ChatComponent: React.FC<ChatProps> = ({ selectedPdfIds, sessionId, onSessi
   const sendMessage = async () => {
     const text = message.trim();
     if (!text || loading) return;
+    const historyToSend = messages.slice(-10);
     setMessage('');
     setMessages((prev) => [...prev, { role: 'user', content: text }]);
     setLoading(true);
@@ -157,10 +158,18 @@ const ChatComponent: React.FC<ChatProps> = ({ selectedPdfIds, sessionId, onSessi
         onSessionCreated?.(created.id);
       }
 
-      const pdfParam = selectedPdfIds?.length ? `&pdfIds=${selectedPdfIds.join(',')}` : '';
-      const sessionParam = `&sessionId=${currentSessionId}`;
-      const res = await fetch(`http://localhost:8000/chat?message=${encodeURIComponent(text)}${pdfParam}${sessionParam}`, {
-        headers: { Authorization: `Bearer ${token}` },
+      const res = await fetch('http://localhost:8000/chat', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          message: text,
+          chatHistory: historyToSend,
+          pdfIds: selectedPdfIds?.length ? selectedPdfIds : undefined,
+          sessionId: currentSessionId,
+        }),
       });
       const data = await res.json();
       setMessages((prev) => [
