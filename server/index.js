@@ -12,6 +12,9 @@ import { ChatPromptTemplate, MessagesPlaceholder } from '@langchain/core/prompts
 import { StringOutputParser } from '@langchain/core/output_parsers';
 import { clerkMiddleware, getAuth } from '@clerk/express';
 import { PrismaClient } from '@prisma/client';
+import rateLimit from 'express-rate-limit';
+
+const MAX_FILE_SIZE = parseInt(process.env.MAX_UPLOAD_SIZE_MB || '50') * 1024 * 1024;
 
 const prisma = new PrismaClient();
 
@@ -31,15 +34,32 @@ const storage = multer.diskStorage({
   },
   filename: function (req, file, cb) {
     const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1e9);
-    cb(null, `${uniqueSuffix}-${file.originalname}`);
+    const safeName = file.originalname.replace(/[^a-zA-Z0-9._-]/g, '_');
+    cb(null, `${uniqueSuffix}-${safeName}`);
   },
 });
 
-const upload = multer({ storage: storage });
+const upload = multer({
+  storage,
+  limits: { fileSize: MAX_FILE_SIZE },
+  fileFilter: (req, file, cb) => {
+    if (file.mimetype === 'application/pdf') {
+      cb(null, true);
+    } else {
+      cb(new Error('Only PDF files are allowed'));
+    }
+  },
+});
+
+const uploadRateLimit = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { error: 'Too many uploads. Try again in 15 minutes.' },
+  keyGenerator: (req) => getAuth(req).userId || req.ip,
+});
 
 const app = express();
 app.use(cors({ origin: 'http://localhost:3000', allowedHeaders: ['Authorization', 'Content-Type'] }));
-app.use('/uploads', express.static('uploads'));
 app.use(express.json());
 app.use(clerkMiddleware());
 
@@ -73,10 +93,20 @@ app.get('/', (req, res) => {
   return res.json({ status: 'All Good!' });
 });
 
-app.post('/upload/pdf', upload.single('pdf'), async (req, res) => {
+app.post('/upload/pdf', uploadRateLimit, upload.single('pdf'), async (req, res) => {
   const { userId } = getAuth(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
   if (!req.file) return res.status(400).json({ error: 'No PDF file provided.' });
+
+  // Magic-bytes check — confirm file actually starts with %PDF
+  const fd = await fs.open(req.file.path, 'r');
+  const header = Buffer.alloc(4);
+  await fd.read(header, 0, 4, 0);
+  await fd.close();
+  if (header.toString('ascii') !== '%PDF') {
+    await fs.unlink(req.file.path).catch(() => {});
+    return res.status(400).json({ error: 'Invalid file — not a real PDF.' });
+  }
 
   const pdfRecord = await prisma.pdf.create({
     data: {
@@ -192,6 +222,16 @@ app.post('/chat', async (req, res) => {
 
   const { message: userQuery, chatHistory = [], pdfIds, sessionId } = req.body;
 
+  if (pdfIds?.length) {
+    const ownedPdfs = await prisma.pdf.findMany({
+      where: { id: { in: pdfIds }, userId },
+      select: { id: true },
+    });
+    if (ownedPdfs.length !== pdfIds.length) {
+      return res.status(403).json({ error: 'One or more PDF IDs are invalid or do not belong to you.' });
+    }
+  }
+
   if (sessionId) {
     const session = await prisma.chatSession.findUnique({ where: { id: sessionId } });
     if (!session || session.userId !== userId) return res.status(404).json({ error: 'Session not found' });
@@ -261,6 +301,17 @@ app.post('/chat', async (req, res) => {
   }
 
   return res.json({ message: result.answer, docs: result.context });
+});
+
+// Multer error handler — returns clean JSON instead of crashing
+app.use((err, req, res, next) => {
+  if (err.code === 'LIMIT_FILE_SIZE') {
+    return res.status(413).json({ error: `File too large. Maximum size is ${process.env.MAX_UPLOAD_SIZE_MB || 50} MB.` });
+  }
+  if (err.message === 'Only PDF files are allowed') {
+    return res.status(400).json({ error: err.message });
+  }
+  next(err);
 });
 
 httpServer.listen(8000, () => console.log(`Server started on PORT:8000`));

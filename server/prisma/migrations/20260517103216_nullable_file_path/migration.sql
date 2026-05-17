@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Pdf" ALTER COLUMN "filePath" DROP NOT NULL;

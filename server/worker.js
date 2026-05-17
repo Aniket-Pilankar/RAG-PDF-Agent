@@ -4,6 +4,7 @@ import { QdrantVectorStore } from '@langchain/qdrant';
 import { PDFLoader } from '@langchain/community/document_loaders/fs/pdf';
 import { RecursiveCharacterTextSplitter } from '@langchain/textsplitters';
 import { PrismaClient } from '@prisma/client';
+import { promises as fs } from 'fs';
 
 const prisma = new PrismaClient();
 
@@ -41,16 +42,19 @@ const worker = new Worker(
       await vectorStore.addDocuments(docs);
       console.log('Documents added to vector store');
 
+      await fs.unlink(data.path).catch(() => {});
+
       await prisma.pdf.update({
         where: { id: data.pdfId },
-        data: { status: 'ready' },
+        data: { status: 'ready', filePath: null },
       });
     } catch (err) {
       console.error('Worker error:', err);
+      await fs.unlink(data.path).catch(() => {});
       if (data.pdfId) {
         await prisma.pdf.update({
           where: { id: data.pdfId },
-          data: { status: 'failed' },
+          data: { status: 'failed', filePath: null },
         });
       }
       throw err;

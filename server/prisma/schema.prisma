@@ -11,7 +11,7 @@ model Pdf {
   id         String   @id @default(uuid())
   userId     String
   filename   String
-  filePath   String
+  filePath   String?
   status     String   @default("processing")
   uploadedAt DateTime @default(now())
 }
