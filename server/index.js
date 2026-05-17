@@ -260,7 +260,8 @@ app.post('/chat', async (req, res) => {
     ]);
   }
 
-  return res.json({ message: result.answer, docs: result.context });
+  const hasNoAnswer = /i don'?t know|i do not know/i.test(result.answer);
+  return res.json({ message: result.answer, docs: hasNoAnswer ? [] : result.context });
 });
 
 httpServer.listen(8000, () => console.log(`Server started on PORT:8000`));
