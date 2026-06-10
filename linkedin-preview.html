@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PDF AI Agent — LinkedIn Preview</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #f0f0f0;
+    padding: 40px;
+    display: flex;
+    flex-direction: column;
+    gap: 60px;
+    align-items: center;
+  }
+
+  h2.label {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #888;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+
+  /* ─── SCREENSHOT 1 — Full App UI ──────────────────────────────── */
+  .app-window {
+    width: 1100px;
+    border-radius: 12px;
+    overflow: hidden;
+    box-shadow: 0 8px 60px rgba(0,0,0,0.18), 0 2px 8px rgba(0,0,0,0.08);
+    border: 1px solid #e2e2e2;
+    background: #fff;
+    display: flex;
+    flex-direction: column;
+  }
+
+  /* Title bar */
+  .titlebar {
+    background: #f5f5f5;
+    border-bottom: 1px solid #e2e2e2;
+    padding: 11px 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .dot { width: 12px; height: 12px; border-radius: 50%; }
+  .dot.red   { background: #ff5f56; }
+  .dot.yellow{ background: #ffbd2e; }
+  .dot.green { background: #27c93f; }
+  .titlebar-text {
+    flex: 1;
+    text-align: center;
+    font-size: 12px;
+    color: #666;
+    margin-left: -50px;
+  }
+
+  /* App layout */
+  .app-body {
+    display: flex;
+    height: 640px;
+  }
+
+  /* Sidebar */
+  .sidebar {
+    width: 268px;
+    flex-shrink: 0;
+    border-right: 1px solid #e5e5e5;
+    display: flex;
+    flex-direction: column;
+    padding: 18px;
+    gap: 16px;
+    overflow-y: auto;
+    background: #fafafa;
+  }
+
+  .section-label {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: #aaa;
+    margin-bottom: 8px;
+  }
+
+  .sessions-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 8px;
+  }
+
+  .icon-btn {
+    width: 22px; height: 22px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 6px;
+    border: 1px solid #e5e5e5;
+    background: #fff;
+    cursor: pointer;
+    color: #666;
+    font-size: 14px;
+    line-height: 1;
+  }
+
+  .session-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    border-radius: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+    font-size: 12px;
+    color: #888;
+  }
+  .session-item.active {
+    background: #111;
+    color: #fff;
+  }
+  .session-item svg { flex-shrink: 0; }
+  .session-title { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  .divider { border: none; border-top: 1px solid #e5e5e5; }
+
+  /* Upload zone */
+  .upload-zone {
+    border: 2px dashed #d4d4d4;
+    border-radius: 12px;
+    padding: 20px 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    text-align: center;
+  }
+  .upload-icon {
+    width: 36px; height: 36px;
+    background: #f0f0f0;
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    color: #999;
+  }
+  .upload-label { font-size: 12px; font-weight: 500; color: #111; }
+  .upload-sub   { font-size: 11px; color: #aaa; margin-top: 1px; }
+
+  /* PDF list items */
+  .pdf-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 4px;
+    font-size: 12px;
+    color: #444;
+    border-radius: 6px;
+  }
+  .pdf-icon { color: #e53e3e; font-size: 14px; flex-shrink: 0; }
+  .pdf-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pdf-check { margin-left: auto; color: #111; }
+  .pdf-badge {
+    font-size: 9px;
+    font-weight: 600;
+    background: #d1fae5;
+    color: #065f46;
+    border-radius: 4px;
+    padding: 1px 5px;
+  }
+
+  /* How it works */
+  .how-it-works {
+    background: #f5f5f5;
+    border-radius: 10px;
+    padding: 12px 14px;
+    font-size: 11px;
+    color: #888;
+    line-height: 1.6;
+  }
+  .how-it-works strong { font-size: 11px; color: #333; display: block; margin-bottom: 4px; }
+  .how-it-works ol { padding-left: 16px; }
+
+  /* Main chat area */
+  .chat-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #fff;
+  }
+
+  .messages {
+    flex: 1;
+    overflow-y: auto;
+    padding: 28px 32px;
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+  }
+
+  /* User bubble */
+  .msg-user {
+    display: flex;
+    align-items: flex-end;
+    justify-content: flex-end;
+    gap: 10px;
+  }
+  .bubble-user {
+    background: #111;
+    color: #fff;
+    border-radius: 18px 18px 4px 18px;
+    padding: 10px 16px;
+    font-size: 13.5px;
+    line-height: 1.55;
+    max-width: 62%;
+  }
+  .avatar-user {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #111;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    color: #fff;
+  }
+
+  /* Bot bubble */
+  .msg-bot {
+    display: flex;
+    align-items: flex-end;
+    gap: 10px;
+  }
+  .avatar-bot {
+    width: 32px; height: 32px; border-radius: 50%;
+    background: #f0f0f0;
+    border: 1px solid #e5e5e5;
+    display: flex; align-items: center; justify-content: center;
+    flex-shrink: 0;
+    color: #888;
+  }
+  .bubble-bot-wrap { max-width: 68%; }
+  .bubble-bot {
+    background: #fff;
+    border: 1px solid #e5e5e5;
+    border-radius: 18px 18px 18px 4px;
+    padding: 10px 16px;
+    font-size: 13.5px;
+    line-height: 1.6;
+    color: #111;
+  }
+
+  /* Sources accordion */
+  .sources {
+    margin-top: 8px;
+    border: 1px solid #e5e5e5;
+    border-radius: 10px;
+    overflow: hidden;
+    font-size: 12px;
+  }
+  .sources-header {
+    background: #f5f5f5;
+    padding: 7px 12px;
+    display: flex; align-items: center; justify-content: space-between;
+    color: #888;
+    font-size: 11px; font-weight: 500;
+  }
+  .sources-header .left { display: flex; align-items: center; gap: 6px; }
+  .sources-body { background: #fff; }
+  .source-row {
+    padding: 10px 12px;
+    border-top: 1px solid #f0f0f0;
+    display: flex; align-items: flex-start; gap: 10px;
+  }
+  .source-info { flex: 1; }
+  .source-title { font-size: 11.5px; font-weight: 500; color: #111; }
+  .source-page  { font-size: 10px; color: #aaa; margin-top: 1px; }
+  .source-excerpt { font-size: 11px; color: #888; margin-top: 4px; line-height: 1.5; }
+  .source-btn {
+    flex-shrink: 0;
+    border: 1px solid #e5e5e5;
+    background: #fff;
+    border-radius: 6px;
+    padding: 3px 8px;
+    font-size: 10.5px;
+    color: #444;
+    cursor: pointer;
+    display: flex; align-items: center; gap: 3px;
+    white-space: nowrap;
+  }
+
+  /* Typing indicator */
+  .typing { display: flex; gap: 5px; align-items: center; padding: 12px 16px; }
+  .dot-bounce {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #aaa;
+    animation: bounce 1.2s infinite;
+  }
+  .dot-bounce:nth-child(2) { animation-delay: 0.15s; }
+  .dot-bounce:nth-child(3) { animation-delay: 0.30s; }
+  @keyframes bounce {
+    0%,80%,100% { transform: translateY(0); }
+    40% { transform: translateY(-6px); }
+  }
+
+  /* Input bar */
+  .input-bar {
+    border-top: 1px solid #e5e5e5;
+    background: #fff;
+    padding: 12px 16px;
+    display: flex; gap: 8px; align-items: center;
+  }
+  .chat-input {
+    flex: 1;
+    height: 36px;
+    border: 1px solid #e5e5e5;
+    border-radius: 8px;
+    padding: 0 12px;
+    font-size: 13px;
+    color: #333;
+    background: #fff;
+    outline: none;
+  }
+  .send-btn {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    background: #111;
+    color: #fff;
+    border: none;
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+
+  /* ─── SCREENSHOT 2 — Architecture ─────────────────────────────── */
+  .arch-card {
+    width: 900px;
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 8px 60px rgba(0,0,0,0.14), 0 2px 8px rgba(0,0,0,0.06);
+    border: 1px solid #e2e2e2;
+  }
+
+  .arch-header {
+    background: #111;
+    color: #fff;
+    padding: 24px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+  .arch-title h1 { font-size: 22px; font-weight: 700; letter-spacing: -0.3px; }
+  .arch-title p  { font-size: 13px; color: #aaa; margin-top: 4px; }
+  .arch-tags { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+  .arch-tag {
+    background: rgba(255,255,255,0.12);
+    border: 1px solid rgba(255,255,255,0.2);
+    border-radius: 20px;
+    padding: 4px 10px;
+    font-size: 11px;
+    color: #ddd;
+  }
+
+  .arch-body { padding: 36px 40px; }
+
+  .arch-row { display: flex; gap: 20px; margin-bottom: 24px; }
+
+  .arch-box {
+    flex: 1;
+    border: 1px solid #e5e5e5;
+    border-radius: 12px;
+    padding: 20px;
+    background: #fafafa;
+  }
+  .arch-box.accent { background: #f0fdf4; border-color: #bbf7d0; }
+  .arch-box.dark   { background: #111; color: #fff; border-color: #111; }
+
+  .arch-box-title {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #999;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .arch-box.dark .arch-box-title { color: #aaa; }
+  .arch-box.accent .arch-box-title { color: #16a34a; }
+
+  .arch-stack { display: flex; flex-direction: column; gap: 8px; }
+  .arch-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: #fff;
+    border: 1px solid #f0f0f0;
+    border-radius: 8px;
+    font-size: 12px;
+  }
+  .arch-box.dark .arch-item { background: rgba(255,255,255,0.08); border-color: rgba(255,255,255,0.12); color: #eee; }
+  .arch-box.accent .arch-item { background: #fff; border-color: #d1fae5; }
+
+  .arch-icon {
+    width: 28px; height: 28px; border-radius: 6px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 14px;
+    flex-shrink: 0;
+    background: #f0f0f0;
+  }
+  .arch-box.dark .arch-icon { background: rgba(255,255,255,0.15); }
+
+  .arch-item-text strong { font-size: 12px; font-weight: 600; color: #111; display: block; }
+  .arch-box.dark .arch-item-text strong { color: #fff; }
+  .arch-item-text span  { font-size: 10.5px; color: #888; }
+  .arch-box.dark .arch-item-text span { color: #aaa; }
+  .arch-box.accent .arch-item-text strong { color: #111; }
+
+  /* Flow diagram */
+  .flow-section { margin-top: 4px; }
+  .flow-label {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #999;
+    margin-bottom: 16px;
+  }
+  .flow-row {
+    display: flex;
+    align-items: center;
+    gap: 0;
+  }
+  .flow-step {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 6px;
+  }
+  .flow-bubble {
+    width: 44px; height: 44px;
+    border-radius: 50%;
+    background: #111;
+    color: #fff;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 17px;
+  }
+  .flow-name { font-size: 11px; font-weight: 600; color: #111; }
+  .flow-desc { font-size: 10px; color: #999; line-height: 1.3; }
+  .flow-arrow {
+    font-size: 18px;
+    color: #ccc;
+    flex-shrink: 0;
+    margin: 0 4px;
+    padding-bottom: 22px;
+  }
+
+  /* ─── SCREENSHOT 3 — Feature Highlights ──────────────────────── */
+  .features-card {
+    width: 900px;
+    background: #fff;
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 8px 60px rgba(0,0,0,0.14);
+    border: 1px solid #e2e2e2;
+    padding: 40px;
+  }
+  .features-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 20px;
+    margin-top: 28px;
+  }
+  .feature-item {
+    border: 1px solid #e8e8e8;
+    border-radius: 12px;
+    padding: 22px;
+    background: #fafafa;
+  }
+  .feature-emoji { font-size: 28px; margin-bottom: 10px; }
+  .feature-title { font-size: 14px; font-weight: 700; color: #111; margin-bottom: 6px; }
+  .feature-desc  { font-size: 12.5px; color: #666; line-height: 1.6; }
+  .features-heading { text-align: center; }
+  .features-heading h1 { font-size: 26px; font-weight: 800; letter-spacing: -0.5px; color: #111; }
+  .features-heading p  { font-size: 14px; color: #888; margin-top: 6px; }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════
+     IMAGE 1 — Full App Interface
+     Screenshot this at 1440×900 for LinkedIn
+════════════════════════════════════════════════ -->
+<h2 class="label">Image 1 — App Interface</h2>
+
+<div class="app-window">
+  <!-- Title bar -->
+  <div class="titlebar">
+    <div class="dot red"></div>
+    <div class="dot yellow"></div>
+    <div class="dot green"></div>
+    <div class="titlebar-text">PDF AI Agent · localhost:3000</div>
+  </div>
+
+  <!-- App body -->
+  <div class="app-body">
+
+    <!-- ── Sidebar ── -->
+    <aside class="sidebar">
+
+      <!-- Conversations -->
+      <div>
+        <div class="sessions-header">
+          <span class="section-label">Conversations</span>
+          <div class="icon-btn">+</div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:2px;">
+          <div class="session-item active">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span class="session-title">Tell me about the Renaissance</span>
+          </div>
+          <div class="session-item">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span class="session-title">Summarize Chapter 3</span>
+          </div>
+          <div class="session-item">
+            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            <span class="session-title">Key findings in the report</span>
+          </div>
+        </div>
+      </div>
+
+      <hr class="divider" />
+
+      <!-- Documents -->
+      <div>
+        <p class="section-label">Documents</p>
+        <div class="upload-zone">
+          <div class="upload-icon">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 16 12 12 8 16"/><line x1="12" y1="12" x2="12" y2="21"/><path d="M20.39 18.39A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.3"/></svg>
+          </div>
+          <div>
+            <p class="upload-label">Click to upload PDF</p>
+            <p class="upload-sub">Only .pdf files accepted</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- PDF List -->
+      <div>
+        <div class="pdf-item">
+          <span class="pdf-icon">📄</span>
+          <span class="pdf-name">World-History.pdf</span>
+          <span class="pdf-badge">ready</span>
+          <span class="pdf-check" style="margin-left:6px;">✓</span>
+        </div>
+        <div class="pdf-item">
+          <span class="pdf-icon">📄</span>
+          <span class="pdf-name">Q4-Report-2024.pdf</span>
+          <span class="pdf-badge">ready</span>
+          <span class="pdf-check" style="margin-left:6px;">✓</span>
+        </div>
+        <div class="pdf-item" style="color:#aaa;">
+          <span class="pdf-icon" style="color:#ccc;">📄</span>
+          <span class="pdf-name">Research-Paper.pdf</span>
+          <span style="font-size:9px;color:#bbb;margin-left:auto;">indexing…</span>
+        </div>
+      </div>
+
+      <!-- How it works -->
+      <div class="how-it-works">
+        <strong>How it works</strong>
+        <ol>
+          <li>Upload a PDF above</li>
+          <li>Wait while it gets indexed</li>
+          <li>Ask questions in the chat</li>
+        </ol>
+      </div>
+
+    </aside>
+
+    <!-- ── Chat Main ── -->
+    <main class="chat-main">
+      <div class="messages">
+
+        <!-- User message 1 -->
+        <div class="msg-user">
+          <div class="bubble-user">Tell me about the Italian Renaissance and its key figures.</div>
+          <div class="avatar-user">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+        </div>
+
+        <!-- Bot message 1 -->
+        <div class="msg-bot">
+          <div class="avatar-bot">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <div class="bubble-bot-wrap">
+            <div class="bubble-bot">
+              The Italian Renaissance (14th–17th century) was a transformative cultural movement that began in Florence and spread across Europe. Key figures include <strong>Leonardo da Vinci</strong> — the archetypal Renaissance man, excelling in art, science, and engineering — and <strong>Michelangelo</strong>, who created iconic works like the Sistine Chapel ceiling and the statue of David. <strong>Raphael</strong> perfected the ideals of Renaissance art through harmonious compositions and naturalistic figures. On the intellectual side, <strong>Petrarch</strong> is often called the "Father of Humanism," laying the philosophical groundwork for the entire movement.
+            </div>
+            <!-- Sources accordion (open) -->
+            <div class="sources">
+              <div class="sources-header">
+                <div class="left">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                  2 sources
+                </div>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="transform:rotate(180deg);"><polyline points="6 9 12 15 18 9"/></svg>
+              </div>
+              <div class="sources-body">
+                <div class="source-row">
+                  <div class="source-info">
+                    <p class="source-title">World-History.pdf</p>
+                    <p class="source-page">Page 42</p>
+                    <p class="source-excerpt">The Renaissance emerged as a cultural and intellectual movement in 14th century Italy, characterised by renewed interest in classical antiquity…</p>
+                  </div>
+                  <button class="source-btn">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    PDF
+                  </button>
+                </div>
+                <div class="source-row">
+                  <div class="source-info">
+                    <p class="source-title">World-History.pdf</p>
+                    <p class="source-page">Page 45</p>
+                    <p class="source-excerpt">Leonardo da Vinci, born in 1452 in Vinci, Tuscany, exemplified the Renaissance ideal of the polymath — painter, sculptor, architect, musician…</p>
+                  </div>
+                  <button class="source-btn">
+                    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                    PDF
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- User message 2 -->
+        <div class="msg-user">
+          <div class="bubble-user">What was Leonardo da Vinci's most significant scientific contribution?</div>
+          <div class="avatar-user">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+          </div>
+        </div>
+
+        <!-- Bot typing -->
+        <div class="msg-bot">
+          <div class="avatar-bot">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <div class="bubble-bot" style="border-radius:18px 18px 18px 4px;">
+            <div class="typing" style="padding:0">
+              <div class="dot-bounce"></div>
+              <div class="dot-bounce"></div>
+              <div class="dot-bounce"></div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+
+      <!-- Input bar -->
+      <div class="input-bar">
+        <input class="chat-input" type="text" placeholder="Ask something about your PDF…" />
+        <button class="send-btn">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+        </button>
+      </div>
+    </main>
+
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     IMAGE 2 — Tech Architecture
+     Screenshot this at ~1100px wide
+════════════════════════════════════════════════ -->
+<h2 class="label">Image 2 — Architecture</h2>
+
+<div class="arch-card">
+  <div class="arch-header">
+    <div class="arch-title">
+      <h1>PDF AI Agent</h1>
+      <p>RAG-powered document intelligence — ask questions, get cited answers</p>
+    </div>
+    <div class="arch-tags">
+      <span class="arch-tag">Next.js 15</span>
+      <span class="arch-tag">Express.js</span>
+      <span class="arch-tag">LangChain</span>
+      <span class="arch-tag">OpenAI</span>
+      <span class="arch-tag">Qdrant</span>
+      <span class="arch-tag">BullMQ</span>
+      <span class="arch-tag">Socket.io</span>
+      <span class="arch-tag">Clerk Auth</span>
+    </div>
+  </div>
+
+  <div class="arch-body">
+    <div class="arch-row">
+
+      <div class="arch-box dark">
+        <div class="arch-box-title">
+          <span>🖥</span> Frontend
+        </div>
+        <div class="arch-stack">
+          <div class="arch-item">
+            <div class="arch-icon">⚡</div>
+            <div class="arch-item-text">
+              <strong>Next.js 15 + TypeScript</strong>
+              <span>App Router, React 19</span>
+            </div>
+          </div>
+          <div class="arch-item">
+            <div class="arch-icon">🎨</div>
+            <div class="arch-item-text">
+              <strong>shadcn/ui + Tailwind</strong>
+              <span>Component library &amp; styling</span>
+            </div>
+          </div>
+          <div class="arch-item">
+            <div class="arch-icon">🔐</div>
+            <div class="arch-item-text">
+              <strong>Clerk Authentication</strong>
+              <span>Sign-in, JWT sessions</span>
+            </div>
+          </div>
+          <div class="arch-item">
+            <div class="arch-icon">🔌</div>
+            <div class="arch-item-text">
+              <strong>Socket.io Client</strong>
+              <span>Real-time indexing status</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="arch-box">
+        <div class="arch-box-title">
+          <span>⚙️</span> Backend (Express.js)
+        </div>
+        <div class="arch-stack">
+          <div class="arch-item">
+            <div class="arch-icon">🛣</div>
+            <div class="arch-item-text">
+              <strong>REST API (index.js)</strong>
+              <span>/upload/pdf · /chat · /chat/sessions</span>
+            </div>
+          </div>
+          <div class="arch-item">
+            <div class="arch-icon">🔗</div>
+            <div class="arch-item-text">
+              <strong>LangChain LCEL Pipeline</strong>
+              <span>HyDE retrieval + ConversationalChain</span>
+            </div>
+          </div>
+          <div class="arch-item">
+            <div class="arch-icon">📡</div>
+            <div class="arch-item-text">
+              <strong>Socket.io Server</strong>
+              <span>Pushes job:completed to browser</span>
+            </div>
+          </div>
+          <div class="arch-item">
+            <div class="arch-icon">⚡</div>
+            <div class="arch-item-text">
+              <strong>Background Worker (worker.js)</strong>
+              <span>PDF → chunks → embeddings → Qdrant</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="arch-box accent">
+        <div class="arch-box-title">
+          <span>🗄</span> Data &amp; AI
+        </div>
+        <div class="arch-stack">
+          <div class="arch-item">
+            <div class="arch-icon">🧠</div>
+            <div class="arch-item-text">
+              <strong>OpenAI GPT-4o-mini</strong>
+              <span>Chat completion</span>
+            </div>
+          </div>
+          <div class="arch-item">
+            <div class="arch-icon">📐</div>
+            <div class="arch-item-text">
+              <strong>text-embedding-3-small</strong>
+              <span>1536-dim vector embeddings</span>
+            </div>
+          </div>
+          <div class="arch-item">
+            <div class="arch-icon">🔍</div>
+            <div class="arch-item-text">
+              <strong>Qdrant Vector DB</strong>
+              <span>k-NN similarity search</span>
+            </div>
+          </div>
+          <div class="arch-item">
+            <div class="arch-icon">⚛</div>
+            <div class="arch-item-text">
+              <strong>BullMQ + Redis</strong>
+              <span>Async job queue</span>
+            </div>
+          </div>
+          <div class="arch-item">
+            <div class="arch-icon">🐘</div>
+            <div class="arch-item-text">
+              <strong>PostgreSQL</strong>
+              <span>Chat sessions &amp; messages</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Flow diagram -->
+    <div class="flow-section">
+      <div class="flow-label">How it works end-to-end</div>
+      <div class="flow-row">
+        <div class="flow-step">
+          <div class="flow-bubble">📤</div>
+          <div class="flow-name">Upload</div>
+          <div class="flow-desc">User uploads PDF via drag &amp; drop</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <div class="flow-bubble">✂️</div>
+          <div class="flow-name">Chunk</div>
+          <div class="flow-desc">RecursiveTextSplitter breaks PDF into overlapping chunks</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <div class="flow-bubble">🧮</div>
+          <div class="flow-name">Embed</div>
+          <div class="flow-desc">OpenAI converts each chunk to 1536-dim vector</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <div class="flow-bubble">💾</div>
+          <div class="flow-name">Index</div>
+          <div class="flow-desc">Vectors stored in Qdrant per-user collection</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <div class="flow-bubble">🔍</div>
+          <div class="flow-name">Retrieve</div>
+          <div class="flow-desc">HyDE + k-NN finds most relevant chunks for question</div>
+        </div>
+        <div class="flow-arrow">→</div>
+        <div class="flow-step">
+          <div class="flow-bubble">💬</div>
+          <div class="flow-name">Answer</div>
+          <div class="flow-desc">GPT-4o-mini generates grounded answer with citations</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+
+<!-- ══════════════════════════════════════════════
+     IMAGE 3 — Feature Highlights
+     Screenshot this at ~1000px wide
+════════════════════════════════════════════════ -->
+<h2 class="label">Image 3 — Feature Highlights</h2>
+
+<div class="features-card">
+  <div class="features-heading">
+    <h1>PDF AI Agent</h1>
+    <p>Upload any PDF and chat with it — powered by RAG, LangChain &amp; OpenAI</p>
+  </div>
+
+  <div class="features-grid">
+    <div class="feature-item">
+      <div class="feature-emoji">📄</div>
+      <div class="feature-title">PDF Upload &amp; Indexing</div>
+      <div class="feature-desc">Upload any PDF and watch it get chunked, embedded, and indexed in real-time with WebSocket progress updates.</div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-emoji">🔍</div>
+      <div class="feature-title">HyDE Retrieval</div>
+      <div class="feature-desc">Hypothetical Document Embeddings generate a hypothetical answer first, then search — dramatically improving retrieval accuracy.</div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-emoji">💬</div>
+      <div class="feature-title">Conversational Memory</div>
+      <div class="feature-desc">Multi-turn context lets you ask follow-up questions naturally. "How big is it?" after "Tell me about Mars" just works.</div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-emoji">📌</div>
+      <div class="feature-title">Cited Sources</div>
+      <div class="feature-desc">Every answer shows which PDF pages were used, with expandable excerpts and direct PDF download links.</div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-emoji">🔐</div>
+      <div class="feature-title">Per-User Isolation</div>
+      <div class="feature-desc">Each user's documents live in their own Qdrant collection — no cross-user data leakage.</div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-emoji">⚡</div>
+      <div class="feature-title">Async Job Queue</div>
+      <div class="feature-desc">BullMQ + Redis processes PDFs in the background so the UI never blocks. Socket.io pushes "Ready!" the moment indexing completes.</div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-emoji">🗂</div>
+      <div class="feature-title">PDF Library</div>
+      <div class="feature-desc">Upload multiple PDFs, select which ones to query, and manage your document library with delete support.</div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-emoji">📝</div>
+      <div class="feature-title">Chat History</div>
+      <div class="feature-desc">Conversations persist across sessions — browse, resume, or delete past chats from the sidebar, like ChatGPT.</div>
+    </div>
+    <div class="feature-item">
+      <div class="feature-emoji">🏗</div>
+      <div class="feature-title">Production Architecture</div>
+      <div class="feature-desc">Next.js · Express · LangChain · OpenAI · Qdrant · PostgreSQL · BullMQ · Socket.io · Clerk — all containerised with Docker.</div>
+    </div>
+  </div>
+</div>
+
+</body>
+</html>
