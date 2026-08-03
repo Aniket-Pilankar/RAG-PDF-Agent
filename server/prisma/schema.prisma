@@ -14,6 +14,9 @@ model Pdf {
   filePath   String
   status     String   @default("processing")
   uploadedAt DateTime @default(now())
+
+  // GET /pdfs — filters on userId, orders by uploadedAt desc
+  @@index([userId, uploadedAt])
 }
 
 model ChatSession {
@@ -23,6 +26,9 @@ model ChatSession {
   createdAt DateTime  @default(now())
   updatedAt DateTime  @updatedAt
   messages  Message[]
+
+  // GET /chat/sessions — filters on userId, orders by updatedAt desc
+  @@index([userId, updatedAt])
 }
 
 model Message {
@@ -32,4 +38,9 @@ model Message {
   content   String
   createdAt DateTime    @default(now())
   session   ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+
+  // GET /chat/sessions/:id/messages — filters on sessionId, orders by createdAt asc.
+  // The foreign key alone does NOT create this; Postgres indexes the primary-key
+  // side automatically, but not the referencing side.
+  @@index([sessionId, createdAt])
 }
