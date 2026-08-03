@@ -134,13 +134,45 @@ app.delete('/pdfs/:id', async (req, res) => {
   return res.json({ success: true });
 });
 
+const titlePrompt = ChatPromptTemplate.fromMessages([
+  ['system', 'Summarise the user message into a conversation title of 3 to 6 words. Reply with the title only — no quotes, no trailing punctuation, no "Title:" prefix.'],
+  ['human', '{message}'],
+]);
+
+// Trim to a whole word rather than cutting mid-word, and collapse whitespace.
+function fallbackTitle(text) {
+  const clean = (text ?? '').replace(/\s+/g, ' ').trim();
+  if (!clean) return 'New Chat';
+  if (clean.length <= 60) return clean;
+  const cut = clean.slice(0, 60);
+  const lastSpace = cut.lastIndexOf(' ');
+  return `${lastSpace > 20 ? cut.slice(0, lastSpace) : cut}…`;
+}
+
+async function generateTitle(text) {
+  if (!text?.trim()) return 'New Chat';
+  try {
+    // Cap the input so a pasted essay doesn't turn a cheap call into an expensive one.
+    const raw = await titlePrompt
+      .pipe(llm)
+      .pipe(new StringOutputParser())
+      .invoke({ message: text.slice(0, 500) });
+
+    const clean = raw.replace(/^["']|["']$/g, '').replace(/\s+/g, ' ').trim();
+    return clean.length >= 3 && clean.length <= 80 ? clean : fallbackTitle(text);
+  } catch {
+    // A title is cosmetic — never let it fail session creation.
+    return fallbackTitle(text);
+  }
+}
+
 app.post('/chat/sessions', async (req, res) => {
   const { userId } = getAuth(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-  const { title } = req.body;
+  const { firstMessage } = req.body;
   const session = await prisma.chatSession.create({
-    data: { userId, title: title?.slice(0, 100) || 'New Chat' },
+    data: { userId, title: await generateTitle(firstMessage) },
   });
 
   return res.json(session);
@@ -229,8 +261,6 @@ app.post('/chat', async (req, res) => {
     ['human', '{input}'],
   ]);
 
-  console.log('chatHistory', chatHistory);
-
   const formattedHistory = chatHistory.map((msg) =>
     msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content)
   );
@@ -250,8 +280,6 @@ app.post('/chat', async (req, res) => {
   const answer = await qaPrompt.pipe(llm).pipe(new StringOutputParser()).invoke({ input: userQuery, chat_history: formattedHistory, context });
 
   const result = { answer, context: docs };
-
-  console.log('result', result);
 
   if (sessionId) {
     await Promise.all([

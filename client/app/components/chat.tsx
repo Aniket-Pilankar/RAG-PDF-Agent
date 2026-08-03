@@ -152,7 +152,7 @@ const ChatComponent: React.FC<ChatProps> = ({ selectedPdfIds, sessionId, onSessi
         const res = await fetch('http://localhost:8000/chat/sessions', {
           method: 'POST',
           headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: text.slice(0, 80) }),
+          body: JSON.stringify({ firstMessage: text }),
         });
         const created = await res.json();
         currentSessionId = created.id;
