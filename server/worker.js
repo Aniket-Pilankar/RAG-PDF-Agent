@@ -57,7 +57,10 @@ const worker = new Worker(
     }
   },
   {
-    concurrency: 100,
+    // Each job holds a parsed PDF, its chunks and their vectors in memory, and
+    // embeds every chunk. High concurrency exhausts OpenAI rate limits and heap
+    // without improving throughput — parsing is CPU-bound on a single thread.
+    concurrency: 5,
     connection: { host: 'localhost', port: '6379' },
   }
 );
