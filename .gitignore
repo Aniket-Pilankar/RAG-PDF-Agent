@@ -1,2 +1,7 @@
 .DS_Store
-*.md
+
+# Scratch / working notes.
+# Scoped on purpose — a blanket `*.md` also hides README.md,
+# which is the repo's landing page on GitHub.
+*.local.md
+/scratch/
