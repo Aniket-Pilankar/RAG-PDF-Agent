@@ -19,8 +19,6 @@ Built as a full-stack RAG application: a Next.js client, an Express API, and a b
 
 ---
 
-```
-
 ### Ingestion path
 
 1. `POST /upload/pdf` stores the file on disk via multer and creates a `Pdf` row with status `processing`.
@@ -55,23 +53,21 @@ Built as a full-stack RAG application: a Next.js client, an Express API, and a b
 ## Project structure
 
 ```
-
 .
-├── client/ # Next.js frontend
-│ ├── app/
-│ │ ├── components/ # chat, chat-sessions, file-upload, pdf-list
-│ │ ├── layout.tsx # Clerk provider + signed-in/out shell
-│ │ └── page.tsx # sidebar + chat layout
-│ ├── components/ui/ # shadcn primitives
-│ └── proxy.ts # Clerk route protection
+├── client/                      # Next.js frontend
+│   ├── app/
+│   │   ├── components/          # chat, chat-sessions, file-upload, pdf-list
+│   │   ├── layout.tsx           # Clerk provider + signed-in/out shell
+│   │   └── page.tsx             # sidebar + chat layout
+│   ├── components/ui/           # shadcn primitives
+│   └── proxy.ts                 # Clerk route protection
 ├── server/
-│ ├── index.js # Express API + Socket.IO + RAG chat endpoint
-│ ├── worker.js # BullMQ worker: parse → chunk → embed → upsert
-│ ├── prisma/schema.prisma # Pdf, ChatSession, Message
-│ └── uploads/ # stored PDFs (gitignored)
-└── docker-compose.yml # Valkey + Qdrant + Postgres
-
-````
+│   ├── index.js                 # Express API + Socket.IO + RAG chat endpoint
+│   ├── worker.js                # BullMQ worker: parse → chunk → embed → upsert
+│   ├── prisma/schema.prisma     # Pdf, ChatSession, Message
+│   └── uploads/                 # stored PDFs (gitignored)
+└── docker-compose.yml           # Valkey + Qdrant + Postgres
+```
 
 ---
 
@@ -88,7 +84,7 @@ Built as a full-stack RAG application: a Next.js client, an Express API, and a b
 
 ```bash
 docker compose up -d
-````
+```
 
 This brings up all three backing services:
 
@@ -104,7 +100,7 @@ Confirm they're all up:
 docker compose ps
 ```
 
-> Only Postgres declares a volume. Vectors and queue state live inside their containers, so `docker compose down` wipes them — every PDF then has to be re-uploaded and re-embedded, which costs real OpenAI credits. Use `docker compose stop` to pause without losing data.
+> Use `docker compose stop` rather than `down` to keep your indexed data between sessions.
 
 ### 2. Configure the server
 
@@ -284,10 +280,3 @@ All routes except `GET /` require a Clerk bearer token in the `Authorization` he
 Chunk vectors live in Qdrant rather than Postgres, keyed by `metadata.userId` and `metadata.pdfId` so deletes and queries can filter on them.
 
 ---
-
-## Notes and limitations
-
-- Service URLs (`localhost:8000`, `localhost:6333`, `localhost:6379`) are hardcoded rather than configurable via environment variables.
-- Uploaded PDFs are written to the server's local disk, so the API and worker must share a filesystem.
-- Chat responses are returned in a single request — there is no token streaming.
-- Retrieval is fixed at the top 5 chunks with no reranking step.
