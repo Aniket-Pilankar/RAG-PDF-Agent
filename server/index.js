@@ -222,11 +222,22 @@ app.post('/chat', async (req, res) => {
   const { userId } = getAuth(req);
   if (!userId) return res.status(401).json({ error: 'Unauthorized' });
 
-  const { message: userQuery, chatHistory = [], pdfIds, sessionId } = req.body;
+  const { message: userQuery, pdfIds, sessionId } = req.body;
 
+  let chatHistory = [];
   if (sessionId) {
     const session = await prisma.chatSession.findUnique({ where: { id: sessionId } });
     if (!session || session.userId !== userId) return res.status(404).json({ error: 'Session not found' });
+
+    // Read the last 10 turns before saving the new message, so the current
+    // question doesn't end up inside its own history.
+    const recent = await prisma.message.findMany({
+      where: { sessionId },
+      orderBy: { createdAt: 'desc' },
+      take: 10,
+    });
+    chatHistory = recent.reverse();
+
     await prisma.message.create({ data: { sessionId, role: 'user', content: userQuery } });
   }
 

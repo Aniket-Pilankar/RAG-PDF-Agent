@@ -140,7 +140,6 @@ const ChatComponent: React.FC<ChatProps> = ({ selectedPdfIds, sessionId, onSessi
   const sendMessage = async () => {
     const text = message.trim();
     if (!text || loading) return;
-    const historyToSend = messages.slice(-10);
     setMessage('');
     setMessages((prev) => [...prev, { role: 'user', content: text }]);
     setLoading(true);
@@ -167,7 +166,6 @@ const ChatComponent: React.FC<ChatProps> = ({ selectedPdfIds, sessionId, onSessi
         },
         body: JSON.stringify({
           message: text,
-          chatHistory: historyToSend,
           pdfIds: selectedPdfIds?.length ? selectedPdfIds : undefined,
           sessionId: currentSessionId,
         }),
